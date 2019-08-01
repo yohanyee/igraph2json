@@ -1,6 +1,7 @@
 library(tidyverse)
 library(magrittr)
 library(igraph)
+library(corrplot)
 
 #######################
 # Get example data ----
@@ -32,6 +33,7 @@ edge_df <- network_data %>%
   rename(source=preferredName_A, target=preferredName_B)
 
 g <- graph_from_data_frame(edge_df, vertices = node_df)
+E(g)$weight <- get.edge.attribute(g)$score
 attributes(g)
 
 # Detect communities
@@ -39,6 +41,10 @@ communities <- cluster_walktrap(g)
 node_df <- node_df %>% inner_join(data.frame(id=names(membership(communities)), 
                                   community=as.integer(membership(communities))),
                        by="id")
+
+# Also create adjacency matrix
+adj <- as_adj(g,attr = "score")
+corrplot(as.matrix(adj), is.corr=F, method="color")
 
 # Display
 plot(g, layout=layout.fruchterman.reingold(g), edge.width=(E(g)/100)^2, edge.arrow.mode=0, vertex.label.family="sansserif")
@@ -55,5 +61,12 @@ dev.off()
 
 # Write out
 source("R/convert.R")
-write_df(templatedir="template", outdir="plot", node_df = node_df %>% mutate(name=id), edge_df = edge_df, node_size_column = NA, node_size = 5)
 
+# If creating plots directly from dataframes that contain node and edge information
+create_plot_from_df(node_df = node_df %>% mutate(name=id), edge_df = edge_df, templatedir="template", outdir="plot_from_df", node_size_column = NA, node_size = 5)
+
+# If creating plots from igraph object
+create_plot_from_igraph(g, templatedir="template", outdir="plot_from_igraph", node_size_column = NA, node_size = 5)
+
+# If creating plots from adjacency matrix
+create_plot_from_adj(adj, templatedir="template", outdir="plot_from_adj", node_size_column = NA, node_size = 5)

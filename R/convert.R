@@ -3,16 +3,12 @@ library(magrittr)
 library(igraph)
 library(rjson)
 
-edges <- E(g)
-nodes <- V(g)
 
-# Adjacency matrix to graph
-
-# Graph to dataframe
+######################################
+# Convert various objects to json ----
+######################################
 
 # Dataframe to json
-# node_df: must have columns "id" and optionally "community"
-# edge_df: must have columns "source" and "target"
 df_to_json <- function(node_df, edge_df) {
   # Initialize list object
   jsobj <- list()
@@ -30,12 +26,41 @@ df_to_json <- function(node_df, edge_df) {
     jsobj$links[[i]] <- as.list(edge_df[i,])
   }
   
-  return(toJSON(jsobj))
+  out <- toJSON(jsobj)
+  return(out)
 }
 
-#####################
-# Write out data ----
-#####################
+# Graph to json
+igraph_to_json <- function(g) {
+  edge_df <- as.data.frame(get.edgelist(g))
+  colnames(edge_df) <- c("source", "target")
+  for (n in names(edge_attr(g))) {
+    edge_df[[n]] <- get.edge.attribute(g, n)
+  }
+  
+  node_df <- as.data.frame(get.vertex.attribute(g))
+  colnames(node_df)[which(colnames(node_df)=="name")] <- "id"
+  
+  communities <- cluster_walktrap(g)
+  node_df <- node_df %>% inner_join(data.frame(id=names(membership(communities)), 
+                                               community=as.integer(membership(communities))),
+                                    by="id")
+  out <- df_to_json(node_df, edge_df)
+  return(out)
+}
+
+# Adjacency matrix to json
+adj_to_json <- function(adj) {
+  g <- graph_from_adjacency_matrix(adj, weighted = T)
+  out <- igraph_to_json(g)
+  return(out)
+}
+
+
+
+########################################
+# Basic functions to write out data ----
+########################################
 
 # Write json
 write_json <- function(x, path) {
@@ -70,10 +95,8 @@ write_template <- function(template_path, output_path, jsonfile, node_size_colum
   write_file(template_string, output_path)
 }
 
-# Write dataframe
-write_df <- function(templatedir, outdir, node_df, edge_df, node_size_column=NULL, link_width_column=NULL, node_size=5, link_width=1) {
+create_plot <- function(jsobj, templatedir="template", outdir="plot", node_size_column=NULL, link_width_column=NULL, node_size=5, link_width=1) {
   
-  jsobj <- df_to_json(node_df, edge_df)
   
   if (is.null(node_size_column) & ncol(node_df) >= 2) {
     cnames <- colnames(node_df)
@@ -110,8 +133,25 @@ write_df <- function(templatedir, outdir, node_df, edge_df, node_size_column=NUL
     
     file.copy(file.path(templatedir, "forceInABox.js"), file.path(outdir, "forceInABox.js"), overwrite = T)  
   }
-  
 }
 
+#########################################################################################################
+# Helper functions that takes in an object and creates a folder with the required html and JS files  ----
+#########################################################################################################
+
+create_plot_from_df <- function(node_df, edge_df, templatedir="template", outdir="plot", node_size_column=NULL, link_width_column=NULL, node_size=5, link_width=1) {
+  jsobj <- df_to_json(node_df, edge_df)
+  create_plot(jsobj, templatedir, outdir, node_size_column, link_width_column, node_size, link_width)
+}
+
+create_plot_from_igraph <- function(g, templatedir="template", outdir="plot", node_size_column=NULL, link_width_column=NULL, node_size=5, link_width=1) {
+  jsobj <- igraph_to_json(g)
+  create_plot(jsobj, templatedir, outdir, node_size_column, link_width_column, node_size, link_width)
+}
+
+create_plot_from_adj <- function(adj, templatedir="template", outdir="plot", node_size_column=NULL, link_width_column=NULL, node_size=5, link_width=1) {
+  jsobj <- adj_to_json(adj)
+  create_plot(jsobj, templatedir, outdir, node_size_column, link_width_column, node_size, link_width)
+}
 
 
