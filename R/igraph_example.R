@@ -7,7 +7,7 @@ library(corrplot)
 # Get example data ----
 #######################
 
-gene_symbols <- c("Fmr1")
+gene_symbols <- c("Shank3")
 min_score <- 700 # Out of 1000
 
 # Get STRINGids for an example gene
